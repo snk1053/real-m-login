@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-// Supabase client（公開情報のみ）
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -9,12 +8,13 @@ const supabase = createClient(
 
 export default function Login() {
   const [redirectUri, setRedirectUri] = useState<string | null>(null)
-  const [log, setLog] = useState<string>('')
+  const [log, setLog] = useState('')
+  const [processing, setProcessing] = useState(false)
 
   const appendLog = (msg: string) =>
     setLog((prev) => prev + msg + '\n')
 
-  // クエリから redirect_uri を取得
+  // redirect_uri を取得
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const redirect = params.get('redirect_uri')
@@ -22,52 +22,61 @@ export default function Login() {
     appendLog('login page loaded')
   }, [])
 
-  // Googleログイン開始
+  // Googleログイン
   const signInWithGoogle = async () => {
     appendLog('start google login')
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.href, // ログイン後このページに戻す
+        redirectTo: window.location.href,
       },
     })
   }
 
-  // Re-alm Edge Functions を呼び出して JWT を取得
+  // Re-alm JWT 発行
   const issueRealmJwt = async () => {
+    if (processing) return
+    setProcessing(true)
+
     const { data } = await supabase.auth.getSession()
     const accessToken = data.session?.access_token
 
     if (!accessToken || !redirectUri) {
       appendLog('missing access token or redirect uri')
+      setProcessing(false)
       return
     }
 
-    appendLog('call ensure-realm-initialized')
+    appendLog('ensure realm initialized')
     await fetch(process.env.NEXT_PUBLIC_REALM_INIT_URL!, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${accessToken}` },
     })
 
-    appendLog('call issue-realm-jwt')
-    const res = await fetch(
-      process.env.NEXT_PUBLIC_REALM_ISSUE_URL!,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    )
+    appendLog('issue realm jwt')
+    const res = await fetch(process.env.NEXT_PUBLIC_REALM_ISSUE_URL!, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
 
     const json = await res.json()
 
     appendLog('redirect back to service')
-    window.location.href =
-      redirectUri + '?token=' + json.token
+    window.location.href = `${redirectUri}?token=${json.token}`
   }
 
-  // すでにログイン済みなら自動処理
+  // 🔑 OAuth callback を検知する処理（ここが追加点）
+  useEffect(() => {
+    const hasAccessToken = window.location.hash.includes('access_token')
+
+    if (hasAccessToken) {
+      appendLog('oauth callback detected')
+      // Supabase が session を復元するのを少し待つ
+      setTimeout(() => {
+        issueRealmJwt()
+      }, 300)
+    }
+  }, [redirectUri])
+
+  // 既存セッション（SSO）
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session && redirectUri) {
@@ -82,9 +91,7 @@ export default function Login() {
       <h1>Real-m Login</h1>
 
       {!redirectUri && (
-        <p style={{ color: 'red' }}>
-          redirect_uri is missing
-        </p>
+        <p style={{ color: 'red' }}>redirect_uri is missing</p>
       )}
 
       <button onClick={signInWithGoogle}>
