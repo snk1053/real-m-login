@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
+// Supabase client（公開情報のみ）
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+// redirect_uri 保存キー
 const REDIRECT_KEY = 're-alm:redirect_uri'
 
 export default function Login() {
@@ -14,7 +16,7 @@ export default function Login() {
   const appendLog = (msg: string) =>
     setLog((prev) => prev + msg + '\n')
 
-  // 🔹 redirect_uri を localStorage に保存
+  // ① 初回アクセス時に redirect_uri を保存
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const redirect = params.get('redirect_uri')
@@ -27,13 +29,14 @@ export default function Login() {
     }
   }, [])
 
-  // 🔹 Google OAuth 開始（callback 固定）
+  // ② Google OAuth 開始
   const signInWithGoogle = async () => {
     appendLog('start google login')
 
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
+        // 🔑 必ず callback に戻す
         redirectTo: 'https://real-m-login.vercel.app/auth/callback',
       },
     })
