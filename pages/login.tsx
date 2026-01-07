@@ -30,14 +30,19 @@ export default function Login() {
 
   // 🔹 Googleログイン
   const signInWithGoogle = async () => {
-    appendLog('start google login')
+    if (!redirectUri) return
+  
+    // 🔑 callback 用に保存
+    sessionStorage.setItem('redirect_uri', redirectUri)
+  
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: 'https://real-m-login.vercel.app/auth/callback',
       },
     })
   }
+
 
   // 🔹 Realm JWT 発行 → リダイレクト
   const issueRealmJwt = async () => {
