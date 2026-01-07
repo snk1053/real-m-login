@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-// Supabase client（公開情報のみ）
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// redirect_uri 保存キー
 const REDIRECT_KEY = 're-alm:redirect_uri'
 
 export default function Login() {
@@ -16,7 +14,7 @@ export default function Login() {
   const appendLog = (msg: string) =>
     setLog((prev) => prev + msg + '\n')
 
-  // ① 初回アクセス時に redirect_uri を保存
+  // 🔹 redirect_uri を保存（OAuth 前）
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const redirect = params.get('redirect_uri')
@@ -29,7 +27,7 @@ export default function Login() {
     }
   }, [])
 
-  // ② Google OAuth 開始
+  // 🔹 Google OAuth 開始
   const signInWithGoogle = async () => {
     appendLog('start google login')
 
