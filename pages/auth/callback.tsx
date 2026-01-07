@@ -12,77 +12,63 @@ export default function AuthCallback() {
   const handledRef = useRef(false)
 
   useEffect(() => {
-    const run = async () => {
-      if (handledRef.current) return
-      handledRef.current = true
+    const sub = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('auth event:', event)
 
-      // ① redirect_uri を取得（localStorage）
-      const redirectUri = localStorage.getItem(REDIRECT_KEY)
+        if (handledRef.current) return
+        if (event !== 'SIGNED_IN') return
+        if (!session?.access_token) return
 
-      if (!redirectUri) {
-        console.error('redirect_uri not found in localStorage')
-        return
-      }
+        handledRef.current = true
 
-      // ② Supabase session を取得
-      const { data, error } = await supabase.auth.getSession()
-
-      if (error || !data.session) {
-        console.error('session not found', error)
-        return
-      }
-
-      const accessToken = data.session.access_token
-
-      // ③ realm 初期化
-      await fetch(process.env.NEXT_PUBLIC_REALM_INIT_URL!, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-
-      // ④ realm JWT 発行
-      const res = await fetch(
-        process.env.NEXT_PUBLIC_REALM_ISSUE_URL!,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+        const redirectUri = localStorage.getItem(REDIRECT_KEY)
+        if (!redirectUri) {
+          console.error('redirect_uri not found')
+          return
         }
-      )
 
-      if (!res.ok) {
-        console.error('issue realm jwt failed')
-        return
+        const accessToken = session.access_token
+
+        // realm 初期化
+        await fetch(process.env.NEXT_PUBLIC_REALM_INIT_URL!, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+
+        // realm jwt 発行
+        const res = await fetch(
+          process.env.NEXT_PUBLIC_REALM_ISSUE_URL!,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        )
+
+        if (!res.ok) {
+          console.error('issue realm jwt failed')
+          return
+        }
+
+        const json = await res.json()
+        if (!json.token) {
+          console.error('realm jwt missing')
+          return
+        }
+
+        localStorage.removeItem(REDIRECT_KEY)
+
+        window.location.replace(
+          `${redirectUri}?token=${encodeURIComponent(json.token)}`
+        )
       }
+    )
 
-      const json = await res.json()
-
-      if (!json.token) {
-        console.error('realm jwt missing')
-        return
-      }
-
-      // ⑤ 後始末
-      localStorage.removeItem(REDIRECT_KEY)
-
-      // ⑥ 個別サービスへリダイレクト
-      window.location.replace(
-        `${redirectUri}?token=${encodeURIComponent(json.token)}`
-      )
+    return () => {
+      sub.data.subscription.unsubscribe()
     }
-
-    run()
   }, [])
 
   return (
-    <main
-      style={{
-        padding: 40,
-        fontFamily: 'monospace',
-        color: '#666',
-      }}
-    >
+    <main style={{ padding: 40, color: '#666' }}>
       Authenticating...
     </main>
   )
