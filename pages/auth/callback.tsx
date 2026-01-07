@@ -2,15 +2,15 @@ import { useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 export default function AuthCallback() {
   const handledRef = useRef(false)
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange(
+    const sub = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('auth event:', event)
 
@@ -30,18 +30,14 @@ export default function AuthCallback() {
           return
         }
 
-        console.log('calling ensure realm')
-
-        await fetch(process.env.NEXT_PUBLIC_REALM_INIT_URL!, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        })
-
         console.log('calling issue realm jwt')
 
         const res = await fetch(
           process.env.NEXT_PUBLIC_REALM_ISSUE_URL!,
           {
-            headers: { Authorization: `Bearer ${accessToken}` },
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
           }
         )
 
@@ -66,7 +62,7 @@ export default function AuthCallback() {
     )
 
     return () => {
-      sub.subscription.unsubscribe()
+      sub.data.subscription.unsubscribe()
     }
   }, [])
 
