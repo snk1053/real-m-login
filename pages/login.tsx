@@ -17,9 +17,7 @@ export default function Login() {
     setLog((prev) => prev + msg + '\n')
 
   /**
-   * redirect_uri の取得と復元
-   * - 初回: query から取得して localStorage に保存
-   * - OAuth 後: localStorage から復元
+   * redirect_uri の取得・保存・復元
    */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -47,7 +45,7 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // query / hash を含めないのが重要
+        // query / hash を含めない（重要）
         redirectTo: `${window.location.origin}/login`,
       },
     })
@@ -58,7 +56,7 @@ export default function Login() {
   }
 
   /**
-   * Re-alm JWT 発行 → 元サービスへリダイレクト
+   * Re-alm JWT 発行 → redirect_uri に戻す
    */
   const issueRealmJwt = async () => {
     if (processing) return
@@ -104,26 +102,27 @@ export default function Login() {
 
     appendLog('redirect back to service')
 
-    // 使い終わったら消す（重要）
+    // 使い終わったら削除（重要）
     localStorage.removeItem(REDIRECT_STORAGE_KEY)
 
     window.location.href = `${redirectUri}?token=${json.token}`
   }
 
   /**
-   * OAuth コールバック検知
-   * (#access_token が付いた状態)
+   * ✅ OAuth / セッション確立を正しく検知する唯一の方法
    */
   useEffect(() => {
-    const hasAccessToken = window.location.hash.includes('access_token')
-
-    if (hasAccessToken) {
-      appendLog('oauth callback detected')
-
-      // Supabase が session を復元するのを待つ
-      setTimeout(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session && redirectUri) {
+        appendLog('SIGNED_IN event detected')
         issueRealmJwt()
-      }, 300)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
     }
   }, [redirectUri])
 
