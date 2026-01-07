@@ -74,10 +74,13 @@ export default function AuthCallback() {
           // ⑤ 後始末
           localStorage.removeItem(REDIRECT_KEY)
 
-          // ⑥ 個別サービスへリダイレクト
-          window.location.replace(
-            `${redirectUri}?token=${encodeURIComponent(json.token)}`
-          )
+          // ⑥ realm-login 経由でサービスへ遷移（ここだけ変更）
+          const realmLoginUrl =
+            `${process.env.NEXT_PUBLIC_REALM_LOGIN_URL}` +
+            `?token=${encodeURIComponent(json.token)}` +
+            `&redirect=${encodeURIComponent(redirectUri)}`
+
+          window.location.replace(realmLoginUrl)
         } catch (e) {
           console.error('callback error', e)
         }
