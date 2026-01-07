@@ -6,36 +6,38 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-const REDIRECT_KEY = 're-alm:redirect_uri'
-
 export default function AuthCallback() {
   const handledRef = useRef(false)
 
   useEffect(() => {
-    const sub = supabase.auth.onAuthStateChange(
+    const { data: sub } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('auth event:', event)
 
-        if (handledRef.current) return
         if (event !== 'SIGNED_IN') return
-        if (!session?.access_token) return
-
+        if (handledRef.current) return
         handledRef.current = true
 
-        const redirectUri = localStorage.getItem(REDIRECT_KEY)
+        const redirectUri = localStorage.getItem('re-alm:redirect_uri')
         if (!redirectUri) {
-          console.error('redirect_uri not found')
+          console.error('redirect_uri missing')
           return
         }
 
-        const accessToken = session.access_token
+        const accessToken = session?.access_token
+        if (!accessToken) {
+          console.error('access token missing')
+          return
+        }
 
-        // realm 初期化
+        console.log('calling ensure realm')
+
         await fetch(process.env.NEXT_PUBLIC_REALM_INIT_URL!, {
           headers: { Authorization: `Bearer ${accessToken}` },
         })
 
-        // realm jwt 発行
+        console.log('calling issue realm jwt')
+
         const res = await fetch(
           process.env.NEXT_PUBLIC_REALM_ISSUE_URL!,
           {
@@ -44,17 +46,18 @@ export default function AuthCallback() {
         )
 
         if (!res.ok) {
-          console.error('issue realm jwt failed')
+          console.error('issue realm jwt failed', res.status)
           return
         }
 
         const json = await res.json()
+
         if (!json.token) {
           console.error('realm jwt missing')
           return
         }
 
-        localStorage.removeItem(REDIRECT_KEY)
+        localStorage.removeItem('re-alm:redirect_uri')
 
         window.location.replace(
           `${redirectUri}?token=${encodeURIComponent(json.token)}`
@@ -63,13 +66,9 @@ export default function AuthCallback() {
     )
 
     return () => {
-      sub.data.subscription.unsubscribe()
+      sub.subscription.unsubscribe()
     }
   }, [])
 
-  return (
-    <main style={{ padding: 40, color: '#666' }}>
-      Authenticating...
-    </main>
-  )
+  return <div>Authenticating...</div>
 }
