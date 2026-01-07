@@ -35,11 +35,13 @@ export default function AuthCallback() {
         const res = await fetch(
           process.env.NEXT_PUBLIC_REALM_ISSUE_URL!,
           {
+            method: 'POST',
             headers: {
               Authorization: `Bearer ${accessToken}`,
             },
           }
         )
+
 
         if (!res.ok) {
           console.error('issue realm jwt failed', res.status)
