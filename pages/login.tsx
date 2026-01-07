@@ -14,7 +14,7 @@ export default function Login() {
   const appendLog = (msg: string) =>
     setLog((prev) => prev + msg + '\n')
 
-  // 🔹 redirect_uri を保存するだけ
+  // 🔹 redirect_uri を localStorage に保存
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const redirect = params.get('redirect_uri')
@@ -27,7 +27,7 @@ export default function Login() {
     }
   }, [])
 
-  // 🔹 Google OAuth 開始
+  // 🔹 Google OAuth 開始（callback 固定）
   const signInWithGoogle = async () => {
     appendLog('start google login')
 
