@@ -34,34 +34,49 @@ export default function Login() {
   }
 
   // Re-alm JWT 発行
-  const issueRealmJwt = async () => {
-    if (processing) return
-    setProcessing(true)
+const issueRealmJwt = async () => {
+  if (processing) return
+  if (!redirectUri) return
 
-    const { data } = await supabase.auth.getSession()
-    const accessToken = data.session?.access_token
+  setProcessing(true)
 
-    if (!accessToken || !redirectUri) {
-      appendLog('missing access token or redirect uri')
-      setProcessing(false)
-      return
-    }
+  const { data } = await supabase.auth.getSession()
+  const accessToken = data.session?.access_token
 
-    appendLog('ensure realm initialized')
-    await fetch(process.env.NEXT_PUBLIC_REALM_INIT_URL!, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-
-    appendLog('issue realm jwt')
-    const res = await fetch(process.env.NEXT_PUBLIC_REALM_ISSUE_URL!, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-
-    const json = await res.json()
-
-    appendLog('redirect back to service')
-    window.location.href = `${redirectUri}?token=${json.token}`
+  if (!accessToken) {
+    appendLog('missing access token')
+    setProcessing(false)
+    return
   }
+
+  appendLog('ensure realm initialized')
+  await fetch(process.env.NEXT_PUBLIC_REALM_INIT_URL!, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  appendLog('issue realm jwt')
+  const res = await fetch(process.env.NEXT_PUBLIC_REALM_ISSUE_URL!, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  if (!res.ok) {
+    appendLog('issue realm jwt failed')
+    setProcessing(false)
+    return
+  }
+
+  const json = await res.json()
+
+  if (!json.token) {
+    appendLog('token missing in response')
+    setProcessing(false)
+    return
+  }
+
+  appendLog('redirect back to service')
+  window.location.href = `${redirectUri}?token=${json.token}`
+}
+
 
   // 🔑 OAuth callback を検知する処理（ここが追加点）
   useEffect(() => {
