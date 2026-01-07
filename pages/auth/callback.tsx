@@ -15,9 +15,9 @@ export default function AuthCallback() {
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('auth event:', event)
+        console.log('auth event:', event, session)
 
-        // ✅ SIGNED_IN 以外は無視
+        // SIGNED_IN 以外は無視
         if (event !== 'SIGNED_IN') return
         if (handledRef.current) return
         handledRef.current = true
@@ -29,7 +29,7 @@ export default function AuthCallback() {
           return
         }
 
-        // ② access_token が確実にあることを保証
+        // ② access_token を取得
         const accessToken = session?.access_token
         if (!accessToken) {
           console.error('access_token missing')
@@ -43,6 +43,7 @@ export default function AuthCallback() {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${accessToken}`,
+              apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             },
           })
 
@@ -54,6 +55,7 @@ export default function AuthCallback() {
               method: 'POST',
               headers: {
                 Authorization: `Bearer ${accessToken}`,
+                apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
               },
             }
           )
