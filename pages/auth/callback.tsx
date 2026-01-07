@@ -6,8 +6,9 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+const REDIRECT_KEY = 're-alm:redirect_uri'
+
 export default function AuthCallback() {
-  // StrictMode / 再レンダリング対策
   const handledRef = useRef(false)
 
   useEffect(() => {
@@ -15,15 +16,15 @@ export default function AuthCallback() {
       if (handledRef.current) return
       handledRef.current = true
 
-      // ① 保存しておいた redirect_uri を取得
-      const redirectUri = sessionStorage.getItem('redirect_uri')
+      // ① redirect_uri を取得（localStorage）
+      const redirectUri = localStorage.getItem(REDIRECT_KEY)
 
       if (!redirectUri) {
-        console.error('redirect_uri not found in sessionStorage')
+        console.error('redirect_uri not found in localStorage')
         return
       }
 
-      // ② Supabase session を取得（OAuth 復帰後）
+      // ② Supabase session を取得
       const { data, error } = await supabase.auth.getSession()
 
       if (error || !data.session) {
@@ -33,14 +34,14 @@ export default function AuthCallback() {
 
       const accessToken = data.session.access_token
 
-      // ③ Re-alm 初期化（初回のみ内部で効く）
+      // ③ realm 初期化
       await fetch(process.env.NEXT_PUBLIC_REALM_INIT_URL!, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
       })
 
-      // ④ Re-alm JWT 発行
+      // ④ realm JWT 発行
       const res = await fetch(
         process.env.NEXT_PUBLIC_REALM_ISSUE_URL!,
         {
@@ -62,10 +63,10 @@ export default function AuthCallback() {
         return
       }
 
-      // ⑤ 後始末（重要）
-      sessionStorage.removeItem('redirect_uri')
+      // ⑤ 後始末
+      localStorage.removeItem(REDIRECT_KEY)
 
-      // ⑥ 個別サービスへ戻す
+      // ⑥ 個別サービスへリダイレクト
       window.location.replace(
         `${redirectUri}?token=${encodeURIComponent(json.token)}`
       )
@@ -74,7 +75,6 @@ export default function AuthCallback() {
     run()
   }, [])
 
-  // 画面は一切見せない
   return (
     <main
       style={{
