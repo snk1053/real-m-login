@@ -10,12 +10,11 @@ const REDIRECT_KEY = 're-alm:redirect_uri'
 
 export default function Login() {
   const [log, setLog] = useState('')
-  const [processing, setProcessing] = useState(false)
 
   const appendLog = (msg: string) =>
     setLog((prev) => prev + msg + '\n')
 
-  // 🔹 初期化：redirect_uri を保存
+  // 🔹 redirect_uri を保存するだけ
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const redirect = params.get('redirect_uri')
@@ -28,13 +27,10 @@ export default function Login() {
     }
   }, [])
 
-  // 🔹 Googleログイン
+  // 🔹 Google OAuth 開始
   const signInWithGoogle = async () => {
-    if (!redirectUri) return
-  
-    // 🔑 callback 用に保存
-    sessionStorage.setItem('redirect_uri', redirectUri)
-  
+    appendLog('start google login')
+
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -42,66 +38,6 @@ export default function Login() {
       },
     })
   }
-
-
-  // 🔹 Realm JWT 発行 → リダイレクト
-  const issueRealmJwt = async () => {
-    if (processing) return
-    setProcessing(true)
-
-    const redirectUri = localStorage.getItem(REDIRECT_KEY)
-    if (!redirectUri) {
-      appendLog('redirect_uri not found in storage')
-      return
-    }
-
-    const { data } = await supabase.auth.getSession()
-    const accessToken = data.session?.access_token
-
-    if (!accessToken) {
-      appendLog('access token missing')
-      setProcessing(false)
-      return
-    }
-
-    appendLog('ensure realm initialized')
-    await fetch(process.env.NEXT_PUBLIC_REALM_INIT_URL!, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-
-    appendLog('issue realm jwt')
-    const res = await fetch(process.env.NEXT_PUBLIC_REALM_ISSUE_URL!, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-
-    const json = await res.json()
-
-    if (!json.token) {
-      appendLog('realm jwt missing')
-      setProcessing(false)
-      return
-    }
-
-    appendLog('redirecting back to service')
-    localStorage.removeItem(REDIRECT_KEY)
-
-    window.location.href = `${redirectUri}?token=${json.token}`
-  }
-
-  // 🔹 OAuth / 既存セッションを検知（唯一の入口）
-  useEffect(() => {
-    const sub = supabase.auth.onAuthStateChange((event, session) => {
-      appendLog(`auth event: ${event}`)
-
-      if (session?.access_token) {
-        issueRealmJwt()
-      }
-    })
-
-    return () => {
-      sub.data.subscription.unsubscribe()
-    }
-  }, [])
 
   return (
     <main style={{ padding: 40 }}>
